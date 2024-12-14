@@ -96,7 +96,7 @@ void send_display_list(struct SPTask *spTask) {
 
 #if defined(TARGET_PSP)
 /* This flag enables use of the MediaEngine */
-#define ME_EXEC
+//#define ME_EXEC
 
 #include "psp_audio_stack.h"
 #include "sceGuDebugPrint.h"
@@ -153,7 +153,7 @@ int audioOutput(SceSize args, void *argp) {
             case GENERATE: sceGuDebugPrint(8,24,0xffffffff, "GENERATE");break;
             case PLAY: sceGuDebugPrint(8,32,0xffffffff, "PLAY");break;
         }
-        sprintf(buffer, "SOUND: %s", (mediaengine_sound ? "ME" : "CPU"));
+        sprintf(buffer, "SOUND: %s", (mediaengine_sound ? "CPU" : "ME"));
         sceGuDebugPrint(10,48,0xffffffff, buffer);
         #endif
 
