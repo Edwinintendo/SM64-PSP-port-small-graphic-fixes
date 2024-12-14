@@ -20,7 +20,7 @@ Notes: Docker desktop is used for this tutorial. Everything is done in Windows, 
 **Fixed textures live in the psp/textures/ folder. copy these into textures/, overwrite the extracted ones, and rebuild**
 
 **Windows Instructions**
-1. 1. Install Docker Desktop on your system
+1. Install Docker Desktop on your system
 2. Place a Super Mario 64 ROM called `baserom.<VERSION>.z64` into the repository's root directory for asset extraction, where `VERSION` can be `us`, `jp`, or `eu`. **Note: Only US supported**
 3. Go to the directory where your dockerfile is. You can do it from the Docker Desktop terminal with cd: /path/where/is/the/Dockerfile
 **Example: cd/C:\Users\user\Downloads\sm64-port-master**
