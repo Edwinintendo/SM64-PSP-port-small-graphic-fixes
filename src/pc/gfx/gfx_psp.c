@@ -2,6 +2,7 @@
 #include <PR/ultratypes.h>
 #include "gfx_window_manager_api.h"
 #include "gfx_screen_config.h"
+#include "gfx_psp.h"
 #include "macros.h"
 
 #include <stdio.h>
@@ -23,7 +24,7 @@
 #define SCR_HEIGHT (272)
 
 static int force_30fps = 1;
-static unsigned int last_time = 0;
+uint8_t skip_debounce = 0;
 int audio_manager_thid = 0;
 
 /* I forgot why we need this */
@@ -33,7 +34,7 @@ void __assert_func(UNUSED const char *file, UNUSED int line, UNUSED const char *
 /* Minimalist PSP SDK 0.15.0 for Windows whines about missing this, linux built toolchain doesn't care */
 char *stpcpy(char *__restrict__ dest, const char *__restrict__ src) {
     while ((*dest++ = *src++) != '\0')
-        /* nothing */;
+        /* nothing */ ;
     return --dest;
 }
 
@@ -48,7 +49,7 @@ void psp_divert_slow_memory_card(void) {
     char buf[64];
 
     while (ms_to_wait > 0) {
-        sprintf(buf, "Launching in%1.2fs", ms_to_wait/1000.f);
+        sprintf(buf, "Iniciando en %1.2fs", ms_to_wait/1000.f);
         sceGuDebugPrint(32, 32, 0xffffff, buf);
         ms_to_wait -= 16;
         sceGuSync(0, 0);
@@ -57,10 +58,40 @@ void psp_divert_slow_memory_card(void) {
     }
 }
 
+
+char powerCBMessage[256];
+
+/* Define printf, just to make typing easier */
+#define printf  pspDebugScreenPrintf
+
 static int exitCallback(UNUSED int arg1, UNUSED int arg2, UNUSED void *common) {
     J_Cleanup();
     sceKernelTerminateDeleteThread(audio_manager_thid);
     sceKernelExitGame();
+    return 0;
+}
+
+static int power_callback(int unknown, int pwrflags, void *common)
+{
+    /* check for power switch and suspending as one is manual and the other automatic */
+    if (pwrflags & PSP_POWER_CB_POWER_SWITCH || pwrflags & PSP_POWER_CB_SUSPENDING) {
+        sprintf(powerCBMessage,
+        "first arg: 0x%08X, flags: 0x%08X: suspending\n", unknown, pwrflags);
+    } else if (pwrflags & PSP_POWER_CB_RESUMING) {
+        sprintf(powerCBMessage,
+        "first arg: 0x%08X, flags: 0x%08X: resuming from suspend mode\n",
+        unknown, pwrflags);
+    } else if (pwrflags & PSP_POWER_CB_RESUME_COMPLETE) {
+        sprintf(powerCBMessage,
+        "first arg: 0x%08X, flags: 0x%08X: resume complete\n", unknown, pwrflags);
+    } else if (pwrflags & PSP_POWER_CB_STANDBY) {
+        sprintf(powerCBMessage,
+        "first arg: 0x%08X, flags: 0x%08X: entering standby mode\n", unknown, pwrflags);
+    } else {
+        sprintf(powerCBMessage, "first arg: 0x%08X, flags: 0x%08X: Unhandled power event\n", unknown, pwrflags);
+    }
+    sceDisplayWaitVblankStart();
+
     return 0;
 }
 
@@ -69,6 +100,8 @@ static int callbackThread(UNUSED SceSize args, UNUSED void *argp) {
 
     cbid = sceKernelCreateCallback("Exit Callback", exitCallback, NULL);
     sceKernelRegisterExitCallback(cbid);
+    cbid = sceKernelCreateCallback("Power Callback", power_callback, NULL);
+    scePowerRegisterCallback(0, cbid);    
 
     sceKernelSleepThreadCB();
 
@@ -144,12 +177,26 @@ static void gfx_psp_handle_events(void) {
 }
 
 static bool gfx_psp_start_frame(void) {
-    return true;
+    const unsigned int cur_time = sceKernelGetSystemTimeLow();
+    const unsigned int elapsed = cur_time - last_time;
+
+    if (skip_debounce) {
+        skip_debounce--;
+        return true; // Saltar el frame
+    }
+
+    // Saltar el frame si tomó más tiempo del permitido
+    if (elapsed > 33333) { // 30 FPS: 33333 microsegundos (aprox.)
+        skip_debounce = 3; // Saltar como máximo 1 de cada 4 frames
+        last_time = cur_time;
+        return false; // No dibujar este frame
+    }
+
+    return true; // Dibujar el frame
 }
 
 static void gfx_psp_swap_buffers_begin(void) {
-    // Number of microseconds a frame should take (30 fps)
-    const unsigned int FRAME_TIME_US = 33333;
+    const unsigned int FRAME_TIME_US = 33333; // Aproximadamente 30 FPS en microsegundos
     const unsigned int cur_time = sceKernelGetSystemTimeLow();
     const unsigned int elapsed = cur_time - last_time;
     last_time = cur_time;
@@ -166,7 +213,7 @@ static void gfx_psp_swap_buffers_begin(void) {
 }
 
 static void gfx_psp_swap_buffers_end(void) {
-    /* Lets us yield to other threads*/
+    /* Lets us yield to other threads */
     sceKernelDelayThread(100);
 }
 

@@ -9,6 +9,7 @@
 #define _LANGUAGE_C
 #endif
 #include <PR/gbi.h>
+#include "gfx_psp.h"
 
 #include <pspkernel.h>
 #include <pspdebug.h>
@@ -16,12 +17,16 @@
 #include <pspgu.h>
 #include <pspgum.h>
 #include <string.h>
+#include "macros.h"
 
 #include "psp_texture_manager.h"
 
 #define BUF_WIDTH (512)
 #define SCR_WIDTH (480)
 #define SCR_HEIGHT (272)
+#define FOG_SCALE_FACTOR 2.0f  // Escala básica para PSP
+#define FOG_RANGE_EXPANSION 450.0f // Factor adicional para ampliar el rango
+
 
 float identity_matrix[4][4] __attribute__((aligned(16))) = { { 1, 0, 0, 0 }, { 0, 1, 0, 0 }, { 0, 0, 1, 0 }, { 0, 0, 0, 1 } };
 
@@ -158,7 +163,31 @@ static uint32_t shader_broken[27] = {
 unsigned int __attribute__((aligned(64))) list[262144 * 2];
 
 static unsigned int staticOffset = 0;
-unsigned int scegu_fog_color = 0;
+static float scegu_fog_near = 0.0f; // Inicio de la niebla
+static float scegu_fog_far = 0.0f; // Fin de la niebla
+static uint32_t scegu_fog_color = 0xFFA0A0A0; // Color en formato ARGB
+static bool fog_enabled = true; // Estado actual de la niebla
+
+void update_fog_color(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
+    // Convertir los componentes RGBA al formato ARGB y actualizar el valor de scegu_fog_color
+    scegu_fog_color = (a << 24) | (r << 16) | (g << 8) | b;
+
+    // Imprimir el nuevo color para depuración
+    printf("Nuevo color de niebla (ARGB): 0x%08X\n", scegu_fog_color);
+}
+
+void gfx_set_fog_position(float near, float far) {
+    float range = (far - near) * FOG_SCALE_FACTOR * FOG_RANGE_EXPANSION; // Escalamos y ampliamos el rango
+    scegu_fog_near = near * FOG_SCALE_FACTOR;      // Escalamos el valor cercano
+    scegu_fog_far = scegu_fog_near + range;        // Ajustamos el valor lejano
+}
+
+
+
+void gfx_disable_fog() {
+    fog_enabled = false;
+    sceGuDisable(GU_FOG);
+}
 
 static unsigned int getMemorySize(unsigned int width, unsigned int height, unsigned int psm) {
     switch (psm) {
@@ -333,14 +362,23 @@ static void gfx_scegu_apply_shader(struct ShaderProgram *prg) {
         return;
     }
 /*@Note: Revisit one day! */
-#if 0
-    if (prg->shader_id & SHADER_OPT_FOG) {
-        // Yea this doesnt work at all */
-        //sceGuFog(scegu_fog_near, scegu_fog_far, 0x00FF0000);//scegu_fog_color); // color is the same for all verts, only intensity is different
-        //sceGuEnable(GU_FOG);
-        sceGuEnable(GU_BLEND);
-    }
-#endif
+
+
+    // Lógica para establecer el color de la niebla en los shaders
+    switch (prg->shader_id & SHADER_OPT_FOG) {
+        case G_SETFOGCOLOR:
+            {
+                // Recuperar los componentes de color RGBA de los parámetros
+                uint8_t r = C1(24, 8);  // Rojo
+                uint8_t g = C1(16, 8);  // Verde
+                uint8_t b = C1(8, 8);   // Azul
+                uint8_t a = C1(0, 8);   // Alfa
+
+                // Establecer el color de la niebla
+                update_fog_color(r, g, b, a);  // Solo actualiza el color, no llama a `sceGuFog` aquí
+            }
+            break;
+    } 
 
     if (prg->num_inputs) {
         // have colors
@@ -390,6 +428,16 @@ static void gfx_scegu_apply_shader(struct ShaderProgram *prg) {
         }
         sceGuTexFunc(mode, GU_TCC_RGBA);
     }
+
+    // Aplicar la niebla solo una vez, al final
+    if (prg->shader_id & SHADER_OPT_FOG) {
+        gfx_set_fog_position(980, 1000);       // Posición dinámica
+        sceGuFog(scegu_fog_near, scegu_fog_far, scegu_fog_color);  // Aquí aplicamos el color actualizado
+        sceGuEnable(GU_FOG);
+        sceGuEnable(GU_BLEND);
+    } else {
+        sceGuDisable(GU_FOG);
+    }  
 }
 
 static void gfx_scegu_unload_shader(struct ShaderProgram *old_prg) {

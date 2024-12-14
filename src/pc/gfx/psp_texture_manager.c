@@ -15,7 +15,6 @@
 #include <pspdebug.h>
 #include <pspgu.h>
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
 
 static struct PSP_Texture textures[512];
@@ -224,4 +223,48 @@ void texman_bind_tex(unsigned int num) {
 unsigned int texman_get_bound(void) {
     return psp_tex_bound;
 }
-#endif
+
+// Nueva función para ajustar la resolución de las texturas
+int texman_resize_texture(unsigned int num, int new_width, int new_height) {
+    if (num == 0 || num > psp_tex_number) {
+        return -1; // Error: textura no válida
+    }
+
+    struct PSP_Texture *current = &textures[num];
+    unsigned int old_width = current->width;
+    unsigned int old_height = current->height;
+    unsigned int type = current->type;
+
+    // Calcular nuevo tamaño de memoria
+    unsigned int new_size = getMemorySize(new_width, new_height, type);
+    unsigned int old_size = getMemorySize(old_width, old_height, type);
+
+    // Si el tamaño de la nueva textura es menor, se puede ajustar directamente
+    if (new_size <= old_size) {
+        // Reasignar ancho y alto
+        current->width = new_width;
+        current->height = new_height;
+
+        // Ajustar los datos de textura
+        unsigned char *old_data = current->location;
+        unsigned char *new_data = (unsigned char *)malloc(new_size);
+
+        if (!new_data) {
+            return -1; // Error: no se pudo asignar memoria
+        }
+
+        // Copiar los datos existentes a la nueva ubicación
+        memcpy(new_data, old_data, new_size);
+
+        // Reemplazar la ubicación de datos de la textura
+        current->location = new_data;
+
+        // Liberar la memoria de la textura antigua
+        free(old_data);
+    } else {
+        return -2; // Error: el nuevo tamaño es mayor que el anterior
+    }
+
+    return 0; // Éxito
+}
+#endif // TARGET_PSP
