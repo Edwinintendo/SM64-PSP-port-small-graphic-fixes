@@ -29,13 +29,10 @@ Notes: Docker desktop is used for this tutorial. Everything is done in Windows, 
 5. Now, to compile the game run the following command, (change this path, and put the path where the project is): docker run --rm -v /c/Users/user/Downloads/sm64-port-master: /sm64 sm64 make TARGET_PSP=1 pbp VERSION=us -j4
 6. After this, you should start with the compilation, first extracting the game assets, at the end a folder called "build" will appear in the project path, the game will be in: "build\us_psp\mario64".
 
-### Troubleshooting (For Any Platform)
+### Troubleshooting
 
-1. If you get `make: gcc: command not found` or `make: gcc: No such file or directory` although the packages did successfully install, you probably launched the wrong MSYS2. Read the instructions again. The terminal prompt should contain "MINGW32" or "MINGW64" in purple text, and **NOT** "MSYS".
-2. If you get `Failed to open baserom.us.z64!` you failed to place the baserom in the repository. You can write `ls` to list the files in the current working directory. If you are in the `sm64-port` directory, make sure you see it here.
-3. If you get `make: *** No targets specified and no makefile found. Stop.`, you are not in the correct directory. Make sure the yellow text in the terminal ends with `sm64-port`. Use `cd <dir>` to enter the correct directory. If you write `ls` you should see all the project files, including `Makefile` if everything is correct.
-4. If you get any error, be sure MSYS2 packages are up to date by executing `pacman -Syu` and `pacman -Su`. If the MSYS2 window closes immediately after opening it, restart your computer.
-5. When you execute `gcc -v`, be sure you see `Target: i686-w64-mingw32` or `Target: x86_64-w64-mingw32`. If you see `Target: x86_64-pc-msys`, you either opened the wrong MSYS start menu entry or installed the incorrect gcc package.
+1. If you get `Failed to open baserom.us.z64!` you failed to place the baserom in the repository.
+2. If you get `make: *** No targets specified and no makefile found. Stop.`, you are not in the correct directory. Use `cd <dir>` to enter the correct directory.
 
 ## ROM building
 
