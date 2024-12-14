@@ -445,8 +445,29 @@ void render_hud(void) {
         create_dl_ortho_matrix();
 #endif
 
-        if (gCurrentArea != NULL && gCurrentArea->camera->mode == CAMERA_MODE_INSIDE_CANNON) {
-            render_hud_cannon_reticle();
+       if (gCurrentArea != NULL && gCurrentArea->camera->mode == CAMERA_MODE_INSIDE_CANNON) {
+           // Parámetros de traslación y escala para el retículo del cañón
+           float cannonXOffset = 40.0f; // Ajusta según lo necesites
+           float cannonYOffset = 0.0f; // Ajusta según lo necesites
+           float cannonXScale = 0.75f;    // Ajusta según lo necesites
+           float cannonYScale = 1.0f;    // Ajusta según lo necesites
+
+           // Aplica la traslación para el retículo del cañón
+           Mtx *cannonTranslateMtx = alloc_display_list(sizeof(Mtx));
+           if (cannonTranslateMtx != NULL) {
+               guTranslate(cannonTranslateMtx, cannonXOffset, cannonYOffset, 0.0f);
+               gSPMatrix(gDisplayListHead++, VIRTUAL_TO_PHYSICAL(cannonTranslateMtx), G_MTX_MODELVIEW | G_MTX_LOAD);
+            }
+
+           // Aplica la escala para el retículo del cañón
+           Mtx *cannonScaleMtx = alloc_display_list(sizeof(Mtx));
+           if (cannonScaleMtx != NULL) {
+               guScale(cannonScaleMtx, cannonXScale, cannonYScale, 1.0f);
+               gSPMatrix(gDisplayListHead++, VIRTUAL_TO_PHYSICAL(cannonScaleMtx), G_MTX_MODELVIEW | G_MTX_MUL);
+
+              // Renderiza el retículo del cañón con la escala y traslación aplicadas
+               render_hud_cannon_reticle();
+           }
         }
 
         if (hudDisplayFlags & HUD_DISPLAY_FLAG_LIVES) {
@@ -466,9 +487,34 @@ void render_hud(void) {
         }
 
         if (hudDisplayFlags & HUD_DISPLAY_FLAG_CAMERA_AND_POWER) {
-            render_hud_power_meter();
+
+            // Parámetros de traslación y escala para el power meter
+            float xOffset = 42.0f;
+            float yOffset = 0.0f;
+            float xScale = 0.74f;
+            float yScale = 1.0f;
+
+            // Aplica la traslación
+            Mtx *translateMtx = alloc_display_list(sizeof(Mtx));
+            if (translateMtx != NULL) {
+                guTranslate(translateMtx, xOffset, yOffset, 0.0f);
+                gSPMatrix(gDisplayListHead++, VIRTUAL_TO_PHYSICAL(translateMtx), G_MTX_MODELVIEW | G_MTX_LOAD);
+            }
+
+            // Aplica la escala
+            Mtx *scaleMtx = alloc_display_list(sizeof(Mtx));
+            if (scaleMtx != NULL) {
+                guScale(scaleMtx, xScale, yScale, 1.0f);
+                gSPMatrix(gDisplayListHead++, VIRTUAL_TO_PHYSICAL(scaleMtx), G_MTX_MODELVIEW | G_MTX_MUL);
+
+                // Renderiza el medidor de energía con escala y traslación aplicadas
+                render_hud_power_meter();
+            }
+
+            // Renderiza el estado de la cámara
             render_hud_camera_status();
         }
+
 
         if (hudDisplayFlags & HUD_DISPLAY_FLAG_TIMER) {
             render_hud_timer();

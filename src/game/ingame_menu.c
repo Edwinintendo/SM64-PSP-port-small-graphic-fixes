@@ -2111,15 +2111,15 @@ void change_dialog_camera_angle(void) {
 }
 
 void shade_screen(void) {
-    create_dl_translation_matrix(MENU_MTX_PUSH, GFX_DIMENSIONS_FROM_LEFT_EDGE(0), SCREEN_HEIGHT, 0);
+    create_dl_translation_matrix(MENU_MTX_PUSH, GFX_DIMENSIONS_FROM_LEFT_EDGE(-10), SCREEN_HEIGHT, 0);
 
     // This is a bit weird. It reuses the dialog text box (width 130, height -80),
     // so scale to at least fit the screen.
 #ifndef WIDESCREEN
-    create_dl_scale_matrix(MENU_MTX_NOPUSH, 2.6f, 3.4f, 1.0f);
+    create_dl_scale_matrix(MENU_MTX_NOPUSH, 4.6f, 3.4f, 1.0f);
 #else
     create_dl_scale_matrix(MENU_MTX_NOPUSH,
-                           GFX_DIMENSIONS_ASPECT_RATIO * SCREEN_HEIGHT / 130.0f, 3.0f, 1.0f);
+                           GFX_DIMENSIONS_ASPECT_RATIO * SCREEN_HEIGHT / 110.0f, 3.0f, 1.0f);
 #endif
 
     gDPSetEnvColor(gDisplayListHead++, 0, 0, 0, 110);
@@ -2456,12 +2456,12 @@ void print_hud_pause_colorful_str(void) {
 #endif
 
     gSPDisplayList(gDisplayListHead++, dl_rgba16_text_end);
-#if defined(TARGET_PSP)
-    /* Render sound type here */
-    extern int volatile *mediaengine_sound_ptr;
+/*#if defined(TARGET_PSP)
+    /* Render sound type here 
+    extern int volatile *_sound_ptr;
     print_text(0, 0, "SOUND:");
     print_text(0 + (4 * 16), 0, ((*mediaengine_sound_ptr) ? "ME" : "CPU"));
-#endif
+#endif*/
 }
 
 void render_pause_castle_course_stars(s16 x, s16 y, s16 fileNum, s16 courseNum) {
@@ -3045,7 +3045,11 @@ s16 render_menus_and_dialogs() {
     s16 mode = 0;
 
     create_dl_ortho_matrix();
-
+    
+    // Agrega una transformación de escala aquí
+    create_dl_scale_matrix(MENU_MTX_NOPUSH, 0.75f, 1.0f, 1.0f); // Ajusta '0.9f' para reducir el ancho
+    create_dl_translation_matrix(MENU_MTX_NOPUSH, 53.0f, 0.0f, 0.0f); // Ajusta el valor de 30.0 para mover a la derecha
+    
     if (gMenuMode != -1) {
         switch (gMenuMode) {
             case 0:
@@ -3064,7 +3068,6 @@ s16 render_menus_and_dialogs() {
 
         gDialogColorFadeTimer = (s16) gDialogColorFadeTimer + 0x1000;
     } else if (gDialogID != -1) {
-        // The Peach "Dear Mario" message needs to be repositioned separately
         if (gDialogID == 20) {
             print_peach_letter_message();
             return mode;
