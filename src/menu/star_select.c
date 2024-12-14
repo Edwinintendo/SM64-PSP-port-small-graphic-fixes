@@ -1,3 +1,5 @@
+#include <ultra64.h>
+#include <PR/gbi.h>
 #include <PR/ultratypes.h>
 
 #include "audio/external.h"
@@ -13,12 +15,21 @@
 #include "game/object_helpers.h"
 #include "game/object_list_processor.h"
 #include "game/save_file.h"
+#include "game/geo_misc.h"
 #include "game/segment2.h"
 #include "game/segment7.h"
 #include "sm64.h"
 #include "star_select.h"
 #include "text_strings.h"
 #include "prevent_bss_reordering.h"
+
+#define RECT_COLOR_R 255
+#define RECT_COLOR_G 255
+#define RECT_COLOR_B 255
+#define RECT_COLOR_A 255
+#define GFX_DIMENSIONS_FROM_LEFT_EDGE(x) (x)
+#define GFX_DIMENSIONS_FROM_RIGHT_EDGE(x) (SCREEN_WIDTH - (x))
+
 
 /**
  * @file star_select.c
@@ -52,11 +63,58 @@ static s8 sSelectableStarIndex = 0;
 // Act Selector menu timer that keeps counting until you choose an act.
 static s32 sActSelectorMenuTimer = 0;
 
+// Estructura para la transición (puedes ajustar los colores si lo deseas)
+struct WhiteTransitionData {
+    u8 red;
+    u8 green;
+    u8 blue;
+};
+
+extern Gfx dl_proj_mtx_fullscreen[];
+
+
+s32 render_white_background(void) {
+    Vtx *verts = alloc_display_list(4 * sizeof(*verts));
+
+    if (verts != NULL) {
+        // Establecer color blanco
+        u8 r = 255, g = 255, b = 255, alpha = 255; // Color blanco
+
+        // Crear los vértices
+        make_vertex(verts, 0, GFX_DIMENSIONS_FROM_LEFT_EDGE(0), 0, -1, 0, 0, r, g, b, alpha);
+        make_vertex(verts, 1, GFX_DIMENSIONS_FROM_RIGHT_EDGE(0), 0, -1, 0, 0, r, g, b, alpha);
+        make_vertex(verts, 2, GFX_DIMENSIONS_FROM_RIGHT_EDGE(0), SCREEN_HEIGHT, -1, 0, 0, r, g, b, alpha);
+        make_vertex(verts, 3, GFX_DIMENSIONS_FROM_LEFT_EDGE(0), SCREEN_HEIGHT, -1, 0, 0, r, g, b, alpha);
+
+        // Llamar a la lista de proyección
+        gSPDisplayList(gDisplayListHead++, dl_proj_mtx_fullscreen);
+        
+        // Cambiar el modo de renderizado para asegurar que el fondo blanco se dibuje correctamente
+        gDPSetRenderMode(gDisplayListHead++, G_RM_NOOP2, G_RM_NOOP2); // Usar un modo que no interfiere con otros elementos
+        gDPSetCombineMode(gDisplayListHead++, G_CC_PRIMITIVE, G_CC_PRIMITIVE); // Modo de combinación básico para asegurar que se dibuje el blanco
+
+        // Dibujar el fondo
+        gSPVertex(gDisplayListHead++, VIRTUAL_TO_PHYSICAL(verts), 4, 0);
+        gSPDisplayList(gDisplayListHead++, dl_draw_quad_verts_0123);
+
+        // Restaurar el modo de renderizado y combinación después de dibujar el fondo
+        gDPSetRenderMode(gDisplayListHead++, G_RM_AA_XLU_SURF, G_RM_AA_XLU_SURF2);
+        gDPSetCombineMode(gDisplayListHead++, G_CC_SHADE, G_CC_SHADE); // Restaurar modos originales
+    }
+
+    return 0; // Cambiar el retorno a 0 ya que no se necesita un timer
+}
+
+
 /**
  * Act Selector Star Type Loop Action
  * Defines a select type for a star in the act selector.
  */
 void bhv_act_selector_star_type_loop(void) {
+
+    // Renderizar el fondo blanco
+    render_white_background(); // Llamada aquí     
+
     switch (gCurrentObject->oStarSelectorType) {
         // If a star is not selected, don't rotate or change size
         case STAR_SELECTOR_NOT_SELECTED:
@@ -105,6 +163,7 @@ void render_100_coin_star(u8 stars) {
  * checks of what star should be next in sInitSelectedActNum.
  */
 void bhv_act_selector_init(void) {
+
     s16 i = 0;
     s32 selectorModelIDs[10];
     u8 stars = save_file_get_star_flags(gCurrSaveFileNum - 1, gCurrCourseNum - 1);
@@ -212,11 +271,28 @@ void print_course_number(void) {
 
     create_dl_translation_matrix(MENU_MTX_PUSH, 158.0f, 81.0f, 0.0f);
 
+    // Apply scaling to the wood texture for the selector
+    Mtx *mtx;
+    mtx = alloc_display_list(sizeof(Mtx));
+    if (mtx == NULL) {
+        return;
+    }
+
+    // Scale the wood texture (adjust scaleX and scaleY to fit your needs)
+    f32 scaleX = 0.78f;  // Example scaling in X direction
+    f32 scaleY = 1.0f;  // Example scaling in Y direction
+
+    guTranslate(mtx, 158.0f, 81.0f, 0.0f); // Translate to position
+    guScale(mtx, scaleX, scaleY, 1.0f);    // Apply scaling
+
+    gSPMatrix(gDisplayListHead++, VIRTUAL_TO_PHYSICAL(mtx++),
+              G_MTX_MODELVIEW | G_MTX_MUL | G_MTX_PUSH);
+
     // Full wood texture in JP & US, lower part of it on EU
     gSPDisplayList(gDisplayListHead++, dl_menu_rgba16_wood_course);
 
 #ifdef VERSION_EU
-    // Change upper part of the wood texture depending of the language defined
+    // Change upper part of the wood texture depending on the language defined
     switch (language) {
         case LANGUAGE_ENGLISH:
             gSPDisplayList(gDisplayListHead++, dl_menu_texture_course_upper);
@@ -247,6 +323,7 @@ void print_course_number(void) {
     gSPDisplayList(gDisplayListHead++, dl_rgba16_text_end);
 }
 
+
 #if defined(VERSION_JP) || defined(VERSION_SH)
 #define ACT_NAME_X 158
 #else
@@ -256,7 +333,8 @@ void print_course_number(void) {
 /**
  * Print act selector strings, some with special checks.
  */
-void print_act_selector_strings(void) {
+void print_act_selector_strings(void) {    
+
 #ifdef VERSION_EU
     unsigned char myScore[][10] = { {TEXT_MYSCORE}, {TEXT_MY_SCORE_FR}, {TEXT_MY_SCORE_DE} };
 #else
@@ -313,24 +391,77 @@ void print_act_selector_strings(void) {
     gDPSetEnvColor(gDisplayListHead++, 0, 0, 0, 255);
     // Print the "MY SCORE" text if the coin score is more than 0
     if (save_file_get_course_coin_score(gCurrSaveFileNum - 1, gCurrCourseNum - 1) != 0) {
-#ifdef VERSION_EU
-        print_generic_string(95, 118, myScore[language]);
-#else
-        print_generic_string(102, 118, myScore);
-#endif
+        // Define scale factors for X and Y axes
+        f32 scaleX = 0.76f;  // Scale factor for X axis (adjust as needed)
+        f32 scaleY = 1.0f;   // Scale factor for Y axis (adjust as needed)
+
+        // Define position offsets (can be adjusted)
+        f32 offsetX = 102.0f; // Default X position
+        f32 offsetY = 118.0f; // Default Y position
+
+        // Create a transformation matrix for translation and scaling
+        Mtx *mtx = alloc_display_list(sizeof(Mtx));
+        if (mtx == NULL) {
+            return;
+        }
+
+        // Apply translation and scaling
+        guTranslate(mtx, offsetX, offsetY, 0.0f); // Use offsets for position adjustments
+        guScale(mtx, scaleX, scaleY, 1.0f);
+
+        gSPMatrix(gDisplayListHead++, VIRTUAL_TO_PHYSICAL(mtx),
+                  G_MTX_MODELVIEW | G_MTX_MUL | G_MTX_PUSH);
+     
+        // Render the "MY SCORE" text with the position adjusted by the matrix
+    #ifdef VERSION_EU
+        print_generic_string(0, 0, myScore[language]); // Origin is adjusted via the matrix
+    #else
+        print_generic_string(147, 118, myScore);          // Origin is adjusted via the matrix
+    #endif
+
+        // Restore the previous matrix
+        gSPPopMatrix(gDisplayListHead++, G_MTX_MODELVIEW);
     }
 
-#ifdef VERSION_EU
-    print_generic_string(get_str_x_pos_from_center(160, currLevelName + 3, 10.0f), 33, currLevelName + 3);
-#elif defined(VERSION_SH)
-    lvlNameX = get_str_x_pos_from_center_scale(160, currLevelName + 3, 10.0f);
-    print_generic_string(lvlNameX, 33, currLevelName + 3);
-#else
-    lvlNameX = get_str_x_pos_from_center(160, currLevelName + 3, 10.0f);
-    print_generic_string(lvlNameX, 33, currLevelName + 3);
-#endif
+
+    // Define scale factors for X and Y axes
+    f32 scaleX = 0.76f;  // Scale factor for X axis (adjust as needed)
+    f32 scaleY = 1.0f;   // Scale factor for Y axis (adjust as needed)
+
+    // Define offsets for the position
+    f32 offsetY = 30.0f; // Y position (adjust as needed)
+    f32 centerX = 210.0f; // Desired center position in X
+
+    // Create a transformation matrix for scaling
+    Mtx *mtx = alloc_display_list(sizeof(Mtx));
+    if (mtx == NULL) {
+        return;
+    }
+
+    // Apply translation and scaling
+    guTranslate(mtx, centerX, offsetY, 0.0f); // Center X is static, handled by string offset
+    guScale(mtx, scaleX, scaleY, 1.0f);
+
+    gSPMatrix(gDisplayListHead++, VIRTUAL_TO_PHYSICAL(mtx),
+              G_MTX_MODELVIEW | G_MTX_MUL | G_MTX_PUSH);
+
+    // Render the text centered in X using `get_str_x_pos_from_center`
+    #ifdef VERSION_EU
+        s32 centeredX = get_str_x_pos_from_center(centerX, currLevelName + 3, 10.0f);
+        print_generic_string(centeredX, 0, currLevelName + 3); // Y handled by matrix
+    #elif defined(VERSION_SH)
+        s32 centeredX = get_str_x_pos_from_center_scale(centerX, currLevelName + 3, 10.0f);
+        print_generic_string(centeredX, 0, currLevelName + 3); // Y handled by matrix
+    #else
+        s32 centeredX = get_str_x_pos_from_center(centerX, currLevelName + 3, 10.0f);
+        print_generic_string(centeredX, 32, currLevelName + 3); // Y handled by matrix
+    #endif
+
+    // Restore the previous matrix
+    gSPPopMatrix(gDisplayListHead++, G_MTX_MODELVIEW);
 
     gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
+
 
 #ifdef VERSION_EU
     print_course_number((u32)language);
@@ -378,6 +509,7 @@ Gfx *geo_act_selector_strings(s16 callContext, UNUSED struct GraphNode *node, UN
 Gfx *geo_act_selector_strings(s16 callContext, UNUSED struct GraphNode *node) {
 #endif
     if (callContext == GEO_CONTEXT_RENDER) {
+           
         print_act_selector_strings();
     }
     return NULL;
