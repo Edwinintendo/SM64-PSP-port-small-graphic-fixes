@@ -937,7 +937,7 @@ ifeq ($(TARGET_PSP),1)
 	psp-fixup-imports $@
 	psp-prxgen $@ $@.prx
 
-TITLE := "sm64-port $(SRC_VER)"
+TITLE := "Super Mario 64™"
 
 pbp: $(EXE)
 	@mkdir -p $(BUILD_DIR)/mario64
