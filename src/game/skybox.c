@@ -257,7 +257,7 @@ void draw_skybox_tile_grid(Gfx **dlist, s8 background, s8 player, s8 colorIndex)
     s32 col;
 
     for (row = 0; row < 3; row++) {
-        for (col = 0; col < 3; col++) {
+        for (col = -1; col < 4; col++) {
             s32 tileIndex = sSkyBoxInfo[player].upperLeftTile + row * SKYBOX_COLS + col;
             const u8 *const texture =
                 (*(SkyboxTexture *) segmented_to_virtual(sSkyboxTextures[background]))[tileIndex];
@@ -271,39 +271,36 @@ void draw_skybox_tile_grid(Gfx **dlist, s8 background, s8 player, s8 colorIndex)
 }
 
 void *create_skybox_ortho_matrix(s8 player) {
-    f32 left = sSkyBoxInfo[player].scaledX;
-    f32 right = sSkyBoxInfo[player].scaledX + SCREEN_WIDTH;
+    // Calcular el centro de la pantalla
+    f32 center = sSkyBoxInfo[player].scaledX + (SCREEN_WIDTH / 2.0f);
+
+    // Ajuste para pantallas 16:9
+    // Para pantallas 16:9, se calcula un ajuste proporcional de la mitad del ancho
+    f32 half_width = (SCREEN_WIDTH / 2.0f) * (16.0f / 9.0f) / (4.0f / 3.0f);
+
+    // Calcular las coordenadas de la skybox (ajustadas para 16:9)
+    f32 left = center - half_width;
+    f32 right = center + half_width;
     f32 bottom = sSkyBoxInfo[player].scaledY - SCREEN_HEIGHT;
     f32 top = sSkyBoxInfo[player].scaledY;
+
+    // Crear la matriz ortográfica
     Mtx *mtx = alloc_display_list(sizeof(*mtx));
 
-#ifdef WIDESCREEN
-    f32 half_width = (4.0f / 3.0f) / GFX_DIMENSIONS_ASPECT_RATIO * SCREEN_WIDTH / 2;
-    f32 center = (sSkyBoxInfo[player].scaledX + SCREEN_WIDTH / 2);
-    if (half_width < SCREEN_WIDTH / 2) {
-        // A wider screen than 4:3
-        left = center - half_width;
-        right = center + half_width;
-    }
-#endif
-
     if (mtx != NULL) {
-#if defined(TARGET_DC)
-        guOrtho(mtx, left, right, bottom, top, -20.0f, 1.01f, 1.0f);
-#else
+        // Usar guOrtho para establecer la vista ortográfica
         guOrtho(mtx, left, right, bottom, top, 0.0f, 3.0f, 1.0f);
-#endif
-    } else {
     }
 
     return mtx;
 }
 
+
 /**
  * Creates the skybox's display list, then draws the 3x3 grid of tiles.
  */
 Gfx *init_skybox_display_list(s8 player, s8 background, s8 colorIndex) {
-    s32 dlCommandCount = 5 + (3 * 3) * 7; // 5 for the start and end, plus 9 skybox tiles
+    s32 dlCommandCount = 5 + (5 * 3) * 7; // 5 for the start and end, plus 9 skybox tiles
     void *skybox = alloc_display_list(dlCommandCount * sizeof(Gfx));
     Gfx *dlist = skybox;
 
